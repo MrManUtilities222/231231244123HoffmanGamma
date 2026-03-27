@@ -98,6 +98,74 @@ cargo build --release --features audio
     - The engine also tries `.m4a` variants where present.
 - If the audio backend fails to initialize or no compatible files are found, the engine falls back to a silent stub and the game continues to run.
 
+### Platform-specific Notes
+
+- macOS:
+    - Install Xcode command-line tools if not present: `xcode-select --install`.
+    - Rust and `cargo` are available via `rustup`; the audio backend uses CoreAudio and usually requires no extra system packages.
+    - Build and run:
+        ```bash
+        cd MCPE-SourceCode/rust-port
+        cargo build --release
+        ./target/release/rustcraft
+        # To enable audio:
+        cargo build --release --features audio
+        ./target/release/rustcraft
+        ```
+
+- Windows (PowerShell):
+    - Install Rust via `rustup` and ensure the MSVC toolchain is installed (Visual Studio Build Tools).
+    - Build and run in PowerShell:
+        ```powershell
+        cd C:\path\to\MCPE-SourceCode\rust-port
+        cargo build --release
+        .\target\release\rustcraft.exe
+        # To enable audio:
+        cargo build --release --features audio
+        .\target\release\rustcraft.exe
+        ```
+
+- Linux:
+    - For desktop audio support install system audio dev packages (Debian/Ubuntu example):
+        ```bash
+        sudo apt-get install pkg-config libasound2-dev
+        ```
+    - Build and run:
+        ```bash
+        cd MCPE-SourceCode/rust-port
+        cargo build --release
+        ./target/release/rustcraft
+        # To enable audio:
+        cargo build --release --features audio
+        ./target/release/rustcraft
+        ```
+
+### Running in VS Code (Integrated Terminal)
+
+Open the integrated terminal in VS Code (`Ctrl+`` / View → Terminal`) and run the same commands you would in your OS shell.
+
+- Example (macOS / Linux terminal):
+```bash
+cd /path/to/MCPE-SourceCode/rust-port
+rustup default stable
+cargo test --lib -- --nocapture
+cargo build --release
+./target/release/rustcraft
+```
+
+- Example (Windows PowerShell in VS Code):
+```powershell
+cd C:\path\to\MCPE-SourceCode\rust-port
+rustup default stable-x86_64-pc-windows-msvc
+cargo test --lib -- --nocapture
+cargo build --release
+.\target\release\rustcraft.exe
+```
+
+### CI
+
+- A GitHub Actions workflow has been added at `.github/workflows/ci.yml` to build and test on Ubuntu, macOS, and Windows. An audio-enabled Linux job is included which installs `libasound2-dev` and builds with the `audio` feature.
+
 ## Full Feature List Implemented
 
 - ✅ World generation (terrain, biomes, terrain variation)

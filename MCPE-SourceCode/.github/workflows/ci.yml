@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test --lib -- --nocapture
+      - name: Package release artifact (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          cp target/release/rustcraft dist/
+          cp -r ../data dist/data
+          tar -C dist -czf rustcraft-linux-x86_64.tar.gz rustcraft data
+
+      - name: Package release artifact (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          cp target/release/rustcraft dist/
+          cp -r ../data dist/data
+          if command -v hdiutil >/dev/null 2>&1; then
+            hdiutil create -volname "RustCraft" -srcfolder dist -ov -format UDZO rustcraft-macos.dmg
+          fi
+          (cd dist && zip -r ../rustcraft-macos.zip .)
+
+      - name: Package release artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item -Path target\release\rustcraft.exe -Destination dist\
+          Copy-Item -Path ..\data -Destination dist\ -Recurse
+          Compress-Archive -Path dist\* -DestinationPath rustcraft-windows-x86_64.zip
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rustcraft-${{ matrix.os }}-package
+          path: |
+            rustcraft-*.zip
+            rustcraft-*.tar.gz
+            rustcraft-*.dmg
+            dist/**
+
+  audio-linux:
+    name: Audio build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install system audio deps
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Build with audio feature
+        run: cargo build --release --features audio
+
+      - name: Run tests (audio feature)
+        run: cargo test --lib --features audio -- --nocapture
