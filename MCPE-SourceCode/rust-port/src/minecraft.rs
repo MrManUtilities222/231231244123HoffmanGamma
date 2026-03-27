@@ -4,11 +4,13 @@ use crate::options::Options;
 use crate::timer::Timer;
 use crate::level::Level;
 use crate::memory_storage::MemoryLevelStorageSource;
+use crate::sound::SoundEngine;
 
 pub struct Minecraft {
     _options: Options,
     timer: Timer,
     level: Option<Level>,
+    sound: SoundEngine,
     inited: bool,
     finished: bool,
     context: AppContext,
@@ -20,6 +22,7 @@ impl Minecraft {
             _options: Options::new(),
             timer: Timer::new(20.0), // 20 ticks per second
             level: None,
+            sound: SoundEngine::new(48.0),
             inited: false,
             finished: false,
             context: AppContext {
@@ -60,6 +63,8 @@ impl Minecraft {
         let mut level = Level::new(Box::new(source), level_name, (), 0);
         level.generate_terrain(2);
         self.set_level(level, "Level loaded", None);
+        // Update listener to spawn area
+        self.sound.update_listener(0.0, 64.0, 0.0, 0.0);
         println!("Selected level {} (id={})", level_name, level_id);
     }
 

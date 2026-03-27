@@ -80,6 +80,23 @@ cargo build --release
 # - Launch a window on systems with a display
 # - Run headless for 5 seconds to collect metrics on headless systems
 ```
+### Enabling Audio (Desktop)
+
+- Audio is disabled by default to avoid failing builds in CI or headless containers.
+- To enable desktop audio support, install the system development packages and build with the `audio` feature.
+
+On Debian/Ubuntu (example):
+```bash
+sudo apt-get install pkg-config libasound2-dev
+cargo build --release --features audio
+```
+
+- The audio backend (optional `rodio` crate) will attempt to play files from several candidate locations and formats, including:
+    - `data/sound/aac/<category>/<name>.m4a`
+    - `data/sounds/<category>/<name>.ogg`
+    - `data/sound/<category>/<name>.ogg`
+    - The engine also tries `.m4a` variants where present.
+- If the audio backend fails to initialize or no compatible files are found, the engine falls back to a silent stub and the game continues to run.
 
 ## Full Feature List Implemented
 

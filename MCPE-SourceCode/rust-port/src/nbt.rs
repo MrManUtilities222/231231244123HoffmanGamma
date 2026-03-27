@@ -1,8 +1,71 @@
 use std::collections::HashMap;
-use std::io::{self, Read, Write, Cursor};
 
-/// Backwards-compatible alias used by level_data.rs and storage_api.rs
-pub type TagValue = NbtTag;
+/// NBT tag ID constants (compatibility with original code/tests)
+pub const TAG_END: u8 = 0;
+pub const TAG_BYTE: u8 = 1;
+pub const TAG_SHORT: u8 = 2;
+pub const TAG_INT: u8 = 3;
+pub const TAG_LONG: u8 = 4;
+pub const TAG_FLOAT: u8 = 5;
+pub const TAG_DOUBLE: u8 = 6;
+pub const TAG_BYTE_ARRAY: u8 = 7;
+pub const TAG_STRING: u8 = 8;
+pub const TAG_LIST: u8 = 9;
+pub const TAG_COMPOUND: u8 = 10;
+
+/// Backwards-compatible public TagValue used across the codebase. This mirrors
+/// the original project's TagValue layout (including a `List` variant with an
+/// explicit `element_type`), and is kept distinct from the internal `NbtTag`
+/// representation used by `NbtIo` helpers.
+#[derive(Clone, Debug, PartialEq)]
+pub enum TagValue {
+    End,
+    Byte(i8),
+    Short(i16),
+    Int(i32),
+    Long(i64),
+    Float(f32),
+    Double(f64),
+    ByteArray(Vec<u8>),
+    String(String),
+    List { element_type: u8, items: Vec<TagValue> },
+    Compound(HashMap<String, TagValue>),
+}
+
+impl TagValue {
+    pub fn type_id(&self) -> u8 {
+        match self {
+            TagValue::End => TAG_END,
+            TagValue::Byte(_) => TAG_BYTE,
+            TagValue::Short(_) => TAG_SHORT,
+            TagValue::Int(_) => TAG_INT,
+            TagValue::Long(_) => TAG_LONG,
+            TagValue::Float(_) => TAG_FLOAT,
+            TagValue::Double(_) => TAG_DOUBLE,
+            TagValue::ByteArray(_) => TAG_BYTE_ARRAY,
+            TagValue::String(_) => TAG_STRING,
+            TagValue::List { .. } => TAG_LIST,
+            TagValue::Compound(_) => TAG_COMPOUND,
+        }
+    }
+}
+
+pub fn get_tag_name(tag: u8) -> &'static str {
+    match tag {
+        TAG_END => "TAG_End",
+        TAG_BYTE => "TAG_Byte",
+        TAG_SHORT => "TAG_Short",
+        TAG_INT => "TAG_Int",
+        TAG_LONG => "TAG_Long",
+        TAG_FLOAT => "TAG_Float",
+        TAG_DOUBLE => "TAG_Double",
+        TAG_BYTE_ARRAY => "TAG_Byte_Array",
+        TAG_STRING => "TAG_String",
+        TAG_LIST => "TAG_List",
+        TAG_COMPOUND => "TAG_Compound",
+        _ => "TAG_Unknown",
+    }
+}
 
 /// NBT Tag types matching the Minecraft spec.
 #[derive(Clone, Debug, PartialEq)]
@@ -324,9 +387,8 @@ fn write_tag_le(out: &mut MemoryDataOutput, tag: &TagValue) {
             out.write_bytes(v);
         },
         TagValue::String(v) => out.write_string(v),
-        TagValue::List(items) => {
-            let list_type = items.first().map(|t| t.type_id()).unwrap_or(0);
-            out.write_byte(list_type as i8);
+        TagValue::List { element_type, items } => {
+            out.write_byte(*element_type as i8);
             out.write_int(items.len() as i32);
             for item in items {
                 write_tag_le(out, item);
@@ -347,7 +409,7 @@ fn write_tag_le(out: &mut MemoryDataOutput, tag: &TagValue) {
 pub fn write_root_compound(out: &mut MemoryDataOutput, name: &str, tags: BTreeMap<String, TagValue>) {
     out.write_byte(10);
     out.write_string(name);
-    let nbt_map: HashMap<String, NbtTag> = tags.into_iter().collect();
+    let nbt_map: HashMap<String, TagValue> = tags.into_iter().collect();
     let compound = TagValue::Compound(nbt_map);
     write_tag_le(out, &compound);
 }
@@ -373,7 +435,7 @@ fn read_tag_le(inp: &mut MemoryDataInput, tag_type: u8) -> TagValue {
             for _ in 0..count {
                 items.push(read_tag_le(inp, list_type));
             }
-            TagValue::List(items)
+            TagValue::List { element_type: list_type, items }
         },
         10 => {
             let mut map = HashMap::new();

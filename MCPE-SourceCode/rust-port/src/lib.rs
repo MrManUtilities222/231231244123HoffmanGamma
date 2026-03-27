@@ -17,6 +17,7 @@ pub mod storage_api;
 pub mod folder_methods;
 pub mod level_storage_source;
 pub mod memory_storage;
+pub mod sound;
 pub mod vec3;
 pub mod hit_result;
 pub mod aabb;

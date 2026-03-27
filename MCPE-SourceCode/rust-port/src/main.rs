@@ -80,6 +80,7 @@ fn main() {
             .expect("Failed to create windowed GL context");
         unsafe { ctx.make_current().expect("Failed to make GL context current") }
     };
+    // Initial cursor state: grab and hide for gameplay
     windowed_context.window().set_cursor_grab(true).ok();
     windowed_context.window().set_cursor_visible(false);
 
@@ -116,10 +117,17 @@ fn main() {
     let mut last_frame = Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
+        // Helper closure (captures the moved `windowed_context`) to change cursor state
+        let set_cursor = |grab: bool, visible: bool| {
+            windowed_context.window().set_cursor_grab(grab).ok();
+            windowed_context.window().set_cursor_visible(visible);
+        };
         *control_flow = ControlFlow::Poll;
 
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+                // Release cursor before exiting so the desktop isn't left in a grabbed state
+                set_cursor(false, true);
                 app.quit();
                 *control_flow = ControlFlow::Exit;
             }
@@ -129,16 +137,14 @@ fn main() {
                         if key == VirtualKeyCode::Escape {
                             game_state = match game_state {
                                 GameState::Playing => {
-                                    windowed_context.window().set_cursor_grab(false).ok();
-                                    windowed_context.window().set_cursor_visible(true);
+                                    set_cursor(false, true);
                                     let size = windowed_context.window().inner_size();
                                     pause_screen.init(size.width as f32, size.height as f32);
                                     options_screen.init(size.width as f32, size.height as f32);
                                     GameState::Paused
                                 }
                                 GameState::Paused | GameState::Options => {
-                                    windowed_context.window().set_cursor_grab(true).ok();
-                                    windowed_context.window().set_cursor_visible(false);
+                                    set_cursor(true, false);
                                     GameState::Playing
                                 }
                                 _ => GameState::Playing,
@@ -185,6 +191,16 @@ fn main() {
                     }
                 }
             }
+            Event::WindowEvent { event: WindowEvent::Focused(focused), .. } => {
+                if focused {
+                    if game_state == GameState::Playing {
+                        set_cursor(true, false);
+                    }
+                } else {
+                    // Lose input focus -> release cursor
+                    set_cursor(false, true);
+                }
+            }
             Event::WindowEvent { event: WindowEvent::MouseInput { state, button, .. }, .. } => {
                 if game_state != GameState::Playing {
                     let b = match button { MouseButton::Left => 0, MouseButton::Right => 1, _ => 2 };
@@ -202,15 +218,13 @@ fn main() {
                     if let Some(act) = action {
                         match act {
                             rust_port::screen::ScreenAction::CloseScreen => {
-                                windowed_context.window().set_cursor_grab(true).ok();
-                                windowed_context.window().set_cursor_visible(false);
+                                set_cursor(true, false);
                                 game_state = GameState::Playing;
                             }
                             rust_port::screen::ScreenAction::ChangeState(new_state) => {
                                 game_state = new_state;
                                 if new_state == GameState::Playing {
-                                    windowed_context.window().set_cursor_grab(true).ok();
-                                    windowed_context.window().set_cursor_visible(false);
+                                    set_cursor(true, false);
                                 }
                             }
                             _ => {}

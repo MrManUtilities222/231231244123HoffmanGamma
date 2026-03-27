@@ -2,6 +2,54 @@
 /// SoundEngine.h, Sound.h, SoundRepository.h, platform/audio/*
 
 use std::collections::HashMap;
+#[cfg(feature = "audio")]
+use std::path::Path;
+#[cfg(feature = "audio")]
+use std::fs::File;
+#[cfg(feature = "audio")]
+use std::io::BufReader;
+#[cfg(feature = "audio")]
+use std::sync::Mutex;
+
+#[cfg(feature = "audio")]
+mod backend_impl {
+    use super::*;
+    use rodio::{OutputStream, OutputStreamHandle, Sink, Decoder};
+
+    pub struct SoundBackend {
+        pub _stream: OutputStream,
+        pub handle: OutputStreamHandle,
+        pub sinks: Mutex<Vec<Sink>>,
+    }
+
+    impl SoundBackend {
+        pub fn try_new() -> Option<Self> {
+            match OutputStream::try_default() {
+                Ok((stream, handle)) => Some(Self { _stream: stream, handle, sinks: Mutex::new(Vec::new()) }),
+                Err(_) => None,
+            }
+        }
+
+        pub fn play_file(&self, path: &Path, volume: f32) {
+            if let Ok(file) = File::open(path) {
+                let reader = BufReader::new(file);
+                if let Ok(source) = Decoder::new(reader) {
+                    if let Ok(sink) = Sink::try_new(&self.handle) {
+                        sink.set_volume(volume);
+                        sink.append(source);
+                        sink.play();
+                        let mut s = self.sinks.lock().unwrap();
+                        s.push(sink);
+                        s.retain(|snk| !snk.empty());
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "audio")]
+use backend_impl::SoundBackend;
 
 #[derive(Clone, Debug)]
 pub struct SoundDesc {
@@ -44,6 +92,8 @@ pub struct SoundEngine {
     pub listener_yaw: f32,
     pub max_distance: f32,
     repository: SoundRepository,
+    #[cfg(feature = "audio")]
+    backend: Option<SoundBackend>,
 }
 
 impl SoundEngine {
@@ -79,6 +129,8 @@ impl SoundEngine {
             listener_yaw: 0.0,
             max_distance,
             repository: repo,
+            #[cfg(feature = "audio")]
+            backend: SoundBackend::try_new(),
         }
     }
 
@@ -99,9 +151,34 @@ impl SoundEngine {
 
         let vol_mult = 1.0 - (dist / self.max_distance);
         let _final_vol = volume * vol_mult * self.sound_volume * self.master_volume;
+        // Try to play a matching sound file using backend (if enabled).
+        #[cfg(feature = "audio")]
+        {
+            if let Some(backend) = &self.backend {
+                // category paths in repository are like "step.grass" -> "sounds/step/grass.ogg"
+                let rel = name.replace('.', "/");
+                // Try common base paths
+                let candidates = [
+                    format!("sounds/{}.ogg", rel),
+                    format!("sounds/{}.m4a", rel),
+                    format!("data/sounds/{}.ogg", rel),
+                    format!("data/sounds/{}.m4a", rel),
+                    format!("data/sound/{}.ogg", rel),
+                    format!("data/sound/{}.m4a", rel),
+                    format!("data/sound/aac/{}.m4a", rel),
+                    format!("{}/sounds/{}.ogg", std::env::current_dir().unwrap_or_else(|_|".".into()).display(), rel),
+                    format!("{}/sounds/{}.m4a", std::env::current_dir().unwrap_or_else(|_|".".into()).display(), rel),
+                ];
+                for c in &candidates {
+                    let p = Path::new(c);
+                    if p.exists() {
+                        backend.play_file(p, _final_vol as f32);
+                        return;
+                    }
+                }
+            }
+        }
 
-        // TODO: Actual audio playback via rodio/cpal backend
-        // For now this is a stub; the infrastructure is ready.
         #[cfg(debug_assertions)]
         if false { eprintln!("SND: {} at ({},{},{}) vol={:.2}", name, x, y, z, _final_vol); }
     }
@@ -109,7 +186,26 @@ impl SoundEngine {
     pub fn play_ui(&self, name: &str, volume: f32, _pitch: f32) {
         if !self.enabled { return; }
         let _final_vol = volume * self.sound_volume * self.master_volume;
-        // TODO: Play UI sound
+        #[cfg(feature = "audio")]
+        if let Some(backend) = &self.backend {
+            let rel = name.replace('.', "/");
+            let candidates = [
+                format!("sounds/{}.ogg", rel),
+                format!("sounds/{}.m4a", rel),
+                format!("data/sounds/{}.ogg", rel),
+                format!("data/sounds/{}.m4a", rel),
+                format!("data/sound/{}.ogg", rel),
+                format!("data/sound/{}.m4a", rel),
+                format!("data/sound/aac/{}.m4a", rel),
+            ];
+            for c in &candidates {
+                let p = Path::new(c);
+                if p.exists() {
+                    backend.play_file(p, _final_vol as f32);
+                    return;
+                }
+            }
+        }
     }
 
     pub fn enable(&mut self, status: bool) {

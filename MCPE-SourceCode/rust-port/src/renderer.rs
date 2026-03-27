@@ -192,7 +192,7 @@ impl ItemInHandRenderer {
         if self.height > 1.0 { self.height = 1.0; }
     }
 
-    pub fn render_item(&self, t: &mut Tesselator, item: &ItemInstance, scale: f32, equip_progress: f32, swing_progress: f32) {
+    pub fn render_item(&self, t: &mut Tesselator, item: &ItemInstance, scale: f32, equip_progress: f32, _swing_progress: f32) {
         if item.is_null() { return; }
 
         let is_block = item.id < 256;
@@ -209,7 +209,7 @@ impl ItemInHandRenderer {
             let cx = 0.5; let cy = -0.5 + y_offset; let cz = -0.8;
             
             // Map textures
-            let mut tex_id = item.id;
+            let tex_id = item.id;
             // Temporary mapping 
             let u0 = ((tex_id % 16) as f32) / 16.0;
             let v0 = ((tex_id / 16) as f32) / 16.0;
@@ -230,7 +230,7 @@ impl ItemInHandRenderer {
             let s = 0.5 * scale;
             let cx = 0.6; let cy = -0.4 + y_offset; let cz = -0.9;
 
-            let mut tex_id = item.get_aux_value(); // usually mapped by Item definitions
+            let tex_id = item.get_aux_value(); // usually mapped by Item definitions
             let u0 = ((tex_id % 16) as f32) / 16.0;
             let v0 = ((tex_id / 16) as f32) / 16.0;
             let u1 = u0 + 1.0/16.0;
@@ -301,7 +301,7 @@ impl LevelRenderer {
         t.vertex_uv(-s, y, -s, u0, v0);
     }
 
-    pub fn render_entities(&self, t: &mut Tesselator, mobs: &[MobEntity], partial_ticks: f32) {
-        // The main model engine parses this
+    pub fn render_entities(&self, _t: &mut Tesselator, _mobs: &[MobEntity], _partial_ticks: f32) {
+        // The main model engine parses this (placeholder)
     }
 }

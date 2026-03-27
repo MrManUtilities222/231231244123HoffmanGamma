@@ -18,6 +18,12 @@ glutin = "0.28"
 image = "0.24"
 # For lazy static
 lazy_static = "1.4"
+# Desktop audio (optional — enable with `--features audio`)
+rodio = { version = "0.17", optional = true }
+
+[features]
+default = []
+audio = ["rodio"]
 
 [[bin]]
 name = "rustcraft"
